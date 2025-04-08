@@ -7,7 +7,7 @@ yarn-error.log
 # Ignore Laravel & PHP dependencies  
 vendor/  
 .env  
-.env.*  
+# .env.*  
 storage/  
 bootstrap/cache/  
 public/storage  
