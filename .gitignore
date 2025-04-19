@@ -1,0 +1,35 @@
+# Ignore node_modules and dependencies  
+node_modules/
+/node_modules  
+npm-debug.log*  
+yarn-error.log  
+
+# Ignore Laravel & PHP dependencies  
+vendor/  
+.env  
+.env.*  
+storage/  
+bootstrap/cache/  
+public/storage  
+public/hot  
+*.log  
+*.sqlite  
+homestead.yaml  
+.vagrant/  
+
+# Ignore React build files  
+/build  
+.DS_Store  
+
+# Ignore MySQL database dumps  
+*.sql  
+*.sql.gz  
+
+# Ignore IDE and editor files  
+.vscode/  
+.idea/  
+*.sublime-workspace  
+
+# Ignore system files  
+Thumbs.db  
+.DS_Store  
