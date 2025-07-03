@@ -10,11 +10,11 @@ const createDatabase = async () => {
     });
 
     // Create database if not exists
-    await connection.query('CREATE DATABASE IF NOT EXISTS firstvite_app');
+    await connection.query('CREATE DATABASE IF NOT EXISTS firstvite');
     console.log('Database created or already exists');
 
     // Use the database
-    await connection.query('USE firstvite_app');
+    await connection.query('USE firstvite');
 
     // Create users table
     await connection.query(`

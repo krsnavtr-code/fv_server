@@ -39,7 +39,13 @@ exports.adminLogin = async (req, res) => {
       expiresIn: "24h" 
     });
 
-    // Return only the raw JWT string (no 'Bearer ' prefix) for frontend compatibility
+    // Update last login timestamp and IP
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    await db.query(
+      'UPDATE admin_users SET last_login = NOW(), last_login_ip = ? WHERE id = ?',
+      [ip, admin.id]
+    );
+
     console.log('Admin login successful for:', username);
 
     // Return success response with all necessary data
@@ -149,16 +155,40 @@ exports.signup = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    handleValidationErrors(req);
+    console.log('Login attempt received');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // Input validation
+    if (!req.body || !req.body.email || !req.body.password) {
+      console.error('Missing email or password in request');
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+    
     const { email, password } = req.body;
-
-    // Get user
-    const [users] = await db.query(
-      'SELECT id, name, email, password, is_verified FROM users WHERE email = ?',
-      [email]
-    );
+    console.log('Processing login for email:', email);
+    
+    // Get user with role included in the query
+    let users;
+    try {
+      [users] = await db.query(
+        'SELECT id, name, email, password, role, is_active FROM users WHERE email = ?',
+        [email]
+      );
+      console.log('User query result:', JSON.stringify(users, null, 2));
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error during login',
+        error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
 
     if (users.length === 0) {
+      console.log('User not found for email:', email);
       return res.status(400).json({
         success: false,
         message: 'User not found. Please check your email'
@@ -166,9 +196,45 @@ exports.login = async (req, res) => {
     }
 
     const user = users[0];
+    console.log('Found user:', { id: user.id, email: user.email, role: user.role });
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Check if user is an admin/developer (role is 'admin' or 'developer')
+    const isAdminUser = user.role === 'admin' || user.role === 'developer';
+    console.log('User role:', user.role);
+    console.log('Is admin/developer user:', isAdminUser);
+    
+    // For admin/developer users, check password directly (plain text)
+    // For regular users, use bcrypt to verify the hashed password
+    let isMatch = false;
+    try {
+      if (isAdminUser) {
+        console.log('Checking password in plain text');
+        console.log('Input password:', password);
+        console.log('Stored password:', user.password);
+        isMatch = (password === user.password);
+        console.log('Password match result (plain text):', isMatch);
+      } else {
+        console.log('Checking password with bcrypt');
+        console.log('Input password:', password);
+        console.log('Stored password hash:', user.password);
+        isMatch = await bcrypt.compare(password, user.password);
+        console.log('Password match result (bcrypt):', isMatch);
+      }
+    } catch (error) {
+      console.error('Error during password comparison:', {
+        message: error.message,
+        stack: error.stack,
+        inputPassword: password,
+        storedPassword: user.password,
+        isAdminUser
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'Error during authentication',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+    
     if (!isMatch) {
       return res.status(400).json({
         success: false,
@@ -176,8 +242,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check if email is verified
-    if (!user.is_verified) {
+    // Check if user is active
+    if (!user.is_active) {
       const otp = generateOTP();
       const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -203,8 +269,12 @@ exports.login = async (req, res) => {
     // Get user data without password
     const { password: _, ...userData } = user;
 
-    // Update last login timestamp
-    await db.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    // Update last login timestamp and IP
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    await db.query(
+      'UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?',
+      [ip, user.id]
+    );
 
     res.json({
       success: true,

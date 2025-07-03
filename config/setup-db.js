@@ -11,10 +11,10 @@ async function setupDatabase() {
         });
 
         // Create database if it doesn't exist
-        await connection.query('CREATE DATABASE IF NOT EXISTS firstvite_app');
+        await connection.query('CREATE DATABASE IF NOT EXISTS firstvite');
         
         // Use the database
-        await connection.query('USE firstvite_app');
+        await connection.query('USE firstvite');
 
         // Drop existing tables in correct order (verifications first, then users)
         await connection.query('SET FOREIGN_KEY_CHECKS = 0');

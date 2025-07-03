@@ -6,7 +6,7 @@ const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '', // Default for XAMPP
-    database: process.env.DB_NAME || 'firstvite_app',
+    database: process.env.DB_NAME || 'firstvite',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
