@@ -232,8 +232,11 @@ const startServer = async () => {
     await createDefaultCategories();
     
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    const HOST = process.env.HOST || 'localhost';
+    
+    app.listen(PORT, HOST, () => {
+      console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode at http://${HOST}:${PORT}`);
+      console.log(`API Base URL: http://${HOST}:${PORT}/api`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

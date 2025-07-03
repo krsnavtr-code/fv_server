@@ -16,28 +16,32 @@ router.use((req, res, next) => {
 // Admin login route
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    console.log('Request headers:', req.headers);
+    console.log('Request body:', req.body);
     
-    if (!username || !password) {
-      logger.error('Admin login error: Username and password are required');
-      return res.status(400).json({ error: 'Username and password are required' });
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      const errorMsg = `Admin login error: Missing credentials. Email: ${email ? 'provided' : 'missing'}, Password: ${password ? 'provided' : 'missing'}`;
+      logger.error(errorMsg);
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    logger.info('Checking admin user:', { username });
+    logger.info('Checking admin user with email:', { email });
     const [rows] = await req.db.query(
-      'SELECT * FROM admin_users WHERE username = ?',
-      [username]
+      'SELECT * FROM admin_users WHERE email = ?',
+      [email]
     );
 
     logger.info('Query results:', { rowsCount: rows.length });
 
     if (rows.length === 0) {
-      logger.error('Admin login error: User not found');
+      logger.error('Admin login error: User not found with email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const admin = rows[0];
-    logger.info('Found admin user:', { id: admin.id, username: admin.username });
+    logger.info('Found admin user:', { id: admin.id, email: admin.email });
     
     // Compare password
     logger.info('Comparing passwords');
@@ -58,11 +62,14 @@ router.post('/login', async (req, res) => {
 
     logger.info('Admin login successful');
     res.json({ 
+      success: true,
       message: "Login successful",
       token,
       admin: {
         id: admin.id,
-        username: admin.username
+        username: admin.username,
+        role: 'admin',
+        isAdmin: true
       }
     });
   } catch (error) {

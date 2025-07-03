@@ -37,6 +37,47 @@ const app = express();
 // Set database connection on app
 app.set("db", pool);
 
+// Enable CORS for all routes at the very beginning
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://firstvite.com',
+    'https://api.firstvite.com'
+  ];
+  
+  const origin = req.headers.origin;
+  const isAllowedOrigin = !origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development';
+  
+  if (isAllowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    console.log('CORS: Allowed origin:', origin || '*');
+  } else {
+    console.log('CORS: Blocked origin:', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Log CORS headers for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('CORS Headers Set:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+    });
+  }
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    console.log('CORS: Handling OPTIONS preflight request');
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
 // Security middleware
 app.use(helmet());
 app.use(xss());
@@ -46,17 +87,15 @@ app.use(hpp());
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: 'Too many requests from this IP, please try again after 15 minutes'
 });
+
+// Apply rate limiting to API routes
 app.use("/api", limiter);
 
-// Basic middleware
-app.use(
-  cors({
-    origin: ["http://localhost:3000", "https://firstvite.com", "https://api.firstvite.com"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+// Log all requests in development
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
