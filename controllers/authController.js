@@ -30,14 +30,26 @@ exports.adminLogin = async (req, res) => {
       return res.status(401).json({ success: false, error: "Invalid username or password" });
     }
 
-    // Generate JWT token
-    const token = jwt.sign({ 
+    // Generate tokens
+    const accessToken = jwt.sign({ 
       id: admin.id, 
       username: admin.username,
       role: "admin" 
     }, process.env.JWT_SECRET, { 
-      expiresIn: "24h" 
+      expiresIn: "15m" 
     });
+
+    const refreshToken = jwt.sign({
+      id: admin.id,
+      username: admin.username,
+      role: "admin",
+      type: 'refresh'
+    }, process.env.JWT_SECRET, {
+      expiresIn: '7d'
+    });
+
+    // Store the refresh token
+    activeRefreshTokens.add(refreshToken);
 
     // Update last login timestamp and IP
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -51,7 +63,9 @@ exports.adminLogin = async (req, res) => {
     // Return success response with all necessary data
     res.json({ 
       success: true,
-      token, // Only the raw JWT string
+      accessToken,
+      refreshToken,
+      expiresIn: 15 * 60, // 15 minutes in seconds
       message: "Admin login successful",
       admin: {
         id: admin.id,
@@ -71,9 +85,17 @@ const generateOTP = () => {
 };
 
 // Helper function to generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '1d' });
+const generateToken = (userId, expiresIn = '15m') => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn });
 };
+
+// Helper function to generate refresh token
+const generateRefreshToken = (userId) => {
+  return jwt.sign({ userId, type: 'refresh' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Store active refresh tokens (in production, use a database)
+const activeRefreshTokens = new Set();
 
 // Helper function to handle validation errors
 const handleValidationErrors = (req) => {
@@ -263,8 +285,12 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = generateToken(user.id);
+    // Generate tokens
+    const accessToken = generateToken(user.id, '15m');
+    const refreshToken = generateRefreshToken(user.id);
+    
+    // Store the refresh token (in production, store in database)
+    activeRefreshTokens.add(refreshToken);
 
     // Get user data without password
     const { password: _, ...userData } = user;
@@ -278,9 +304,11 @@ exports.login = async (req, res) => {
 
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: userData,
-      message: 'Login successful'
+      message: 'Login successful',
+      expiresIn: 15 * 60 // 15 minutes in seconds
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -656,12 +684,87 @@ exports.getAllInstructors = async (req, res) => {
 // Get all students
 exports.getAllStudents = async (req, res) => {
   try {
-    const [students] = await db.query('SELECT id, name, email, role, is_verified FROM users WHERE role = ?', ['student']);
+    const [users] = await db.query(
+      'SELECT id, name, email, role, created_at FROM users WHERE role = ?',
+      ['student']
+    );
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching students' });
+  }
+};
+
+/**
+ * Refresh access token using refresh token
+ */
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    // Verify the refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      
+      // Check if it's a refresh token
+      if (decoded.type !== 'refresh') {
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid token type'
+        });
+      }
+    } catch (error) {
+      // If token is invalid or expired
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Refresh token has expired. Please log in again.'
+        });
+      }
+      
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    // In production, you would verify the refresh token against the database
+    // For this example, we'll just check if it's in our active tokens set
+    if (!activeRefreshTokens.has(refreshToken)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    // Generate a new access token
+    const accessToken = generateToken(decoded.userId, '15m');
+
+    // Optionally, generate a new refresh token as well (rotation)
+    // const newRefreshToken = generateRefreshToken(decoded.userId);
+    // activeRefreshTokens.delete(refreshToken);
+    // activeRefreshTokens.add(newRefreshToken);
+
     res.json({
       success: true,
-      students
+      accessToken,
+      // refreshToken: newRefreshToken, // If rotating refresh tokens
+      expiresIn: 15 * 60, // 15 minutes in seconds
+      message: 'Token refreshed successfully'
     });
   } catch (error) {
-    handleDBError(error);
+    console.error('Token refresh error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error refreshing token',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

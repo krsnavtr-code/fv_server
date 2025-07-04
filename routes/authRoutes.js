@@ -55,6 +55,7 @@ router.post('/login', loginValidation, authController.login);
 router.post('/verify-email', verifyEmailValidation, authController.verifyEmail);
 router.post('/resend-otp', resendOtpValidation, authController.resendVerification);
 router.post('/admin/login', adminLoginValidation, authController.adminLogin);
+router.post('/refresh-token', authController.refreshToken);
 
 // Protected routes (require authentication)
 router.use(protect);
