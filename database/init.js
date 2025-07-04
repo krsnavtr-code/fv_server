@@ -12,8 +12,8 @@ const connection = mysql.createConnection({
 
 // Create database and tables
 const initDatabase = `
-CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME || 'firstvitenew'};
-USE ${process.env.DB_NAME || 'firstvitenew'};
+CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME || 'firsevite'};
+USE ${process.env.DB_NAME || 'firsevite'};
 
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,

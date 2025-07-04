@@ -5,8 +5,8 @@ require('dotenv').config();
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',  // XAMPP MySQL default has no password
-  database: process.env.DB_NAME || 'firstvite',
+  password: process.env.DB_PASSWORD || 'root',  // XAMPP MySQL default has no password
+  database: process.env.DB_NAME || 'firsevite',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
